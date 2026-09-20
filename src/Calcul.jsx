@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import NavigationHeader from './NavigationHeader';
 
-// Extraction sécurisée du nom de l'item ou de la ressource
+// Extraction sécurisée du nom
 const getName = (obj) => {
   if (!obj) return 'Inconnu';
   if (typeof obj === 'string') return obj;
@@ -21,7 +21,7 @@ const getName = (obj) => {
   return 'Inconnu';
 };
 
-// Extraction sécurisée de l'icône de l'objet
+// Extraction sécurisée de l'icône
 const getItemIcon = (obj) => {
   if (!obj) return null;
   return (
@@ -36,7 +36,7 @@ const getItemIcon = (obj) => {
   );
 };
 
-// Extraction de l'ID Ankama/Dofus
+// Extraction de l'ID d'un ingrédient
 const getIngredientId = (ing) => {
   if (!ing) return null;
   return ing.item_ankama_id || ing.ankama_id || ing.id || ing.item_id;
@@ -47,10 +47,9 @@ export default function Calcul({ onNavigate }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [favorites, setFavorites] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // Stockage des prix unitaires des ingrédients
   const [ingredientPrices, setIngredientPrices] = useState({});
+  const [fetchedResources, setFetchedResources] = useState({});
+  const [loading, setLoading] = useState(true);
 
   // Paramètres de calcul
   const [desiredQuantity, setDesiredQuantity] = useState(1);
@@ -97,7 +96,7 @@ export default function Calcul({ onNavigate }) {
       });
   }, []);
 
-  // Synchroniser le prix HDV sauvegardé quand un équipement est sélectionné
+  // Synchroniser le prix HDV sauvegardé lors de la sélection
   useEffect(() => {
     if (!selectedItem) {
       setMarketPrice(0);
@@ -111,9 +110,35 @@ export default function Calcul({ onNavigate }) {
     } else {
       setMarketPrice(0);
     }
+
+    // Vérifier si des ingrédients ont des noms inconnus et charger le dictionnaire ressources
+    const recipeList = Array.isArray(selectedItem.recipe)
+      ? selectedItem.recipe
+      : Array.isArray(selectedItem.recipe?.ingredients)
+        ? selectedItem.recipe.ingredients
+        : Array.isArray(selectedItem.ingredients)
+          ? selectedItem.ingredients
+          : [];
+
+    const needsFallback = recipeList.some(
+      (ing) => getName(ing) === 'Inconnu' || !getItemIcon(ing)
+    );
+
+    if (needsFallback && Object.keys(fetchedResources).length === 0) {
+      fetch('https://api.dofusdu.de/dofus3/v1/fr/items/resources/all')
+        .then((res) => res.json())
+        .then((data) => {
+          const resList = Array.isArray(data) ? data : data.items || [];
+          const map = {};
+          resList.forEach((resItem) => {
+            if (resItem.ankama_id) map[resItem.ankama_id] = resItem;
+          });
+          setFetchedResources(map);
+        })
+        .catch((err) => console.error('Erreur dictionnaire ressources :', err));
+    }
   }, [selectedItem]);
 
-  // Sauvegarder le prix HDV dans LocalStorage lors de la saisie
   const handleMarketPriceChange = (val) => {
     const num = val === '' ? 0 : Number(val);
     setMarketPrice(num);
@@ -126,7 +151,6 @@ export default function Calcul({ onNavigate }) {
     }
   };
 
-  // Basculer l'état favori d'un équipement
   const toggleFavorite = (item) => {
     if (!item) return;
     const itemId = item.ankama_id || item.id;
@@ -154,7 +178,7 @@ export default function Calcul({ onNavigate }) {
     setDesiredQuantity(1);
   };
 
-  // Extraction propre des ingrédients de la recette
+  // Extraction de la recette
   const recipe = selectedItem
     ? Array.isArray(selectedItem.recipe)
       ? selectedItem.recipe
@@ -194,7 +218,7 @@ export default function Calcul({ onNavigate }) {
     : false;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans w-full">
       <div className="max-w-5xl mx-auto space-y-6">
         
         {/* BARRE DE NAVIGATION */}
@@ -261,225 +285,239 @@ export default function Calcul({ onNavigate }) {
           </div>
         )}
 
-        {/* ÉQUIPEMENT SÉLECTIONNÉ & RECETTE */}
-        {selectedItem && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4 shadow-lg">
-            
-            {/* ENTÊTE DE L'ÉQUIPEMENT */}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center p-1.5 shrink-0">
-                  {getItemIcon(selectedItem) ? (
-                    <img src={getItemIcon(selectedItem)} alt={getName(selectedItem)} className="w-9 h-9 object-contain" />
-                  ) : (
-                    <span className="text-xl">🛡️</span>
-                  )}
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-100">{getName(selectedItem)}</h2>
-                  <p className="text-xs text-amber-500 font-mono">Niveau {selectedItem.level || '?'}</p>
-                </div>
+        {/* ÉQUIPEMENT SÉLECTIONNÉ & RECETTE (TOUJOURS AFFICHÉ) */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4 shadow-lg">
+          
+          {/* ENTÊTE DE L'ÉQUIPEMENT */}
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center p-1.5 shrink-0">
+                {selectedItem && getItemIcon(selectedItem) ? (
+                  <img src={getItemIcon(selectedItem)} alt={getName(selectedItem)} className="w-9 h-9 object-contain" />
+                ) : (
+                  <span className="text-xl">🛡️</span>
+                )}
               </div>
-
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg">
-                  <span className="text-xs text-slate-400 font-medium">Prix HDV :</span>
-                  <input
-                    type="number"
-                    value={marketPrice || ''}
-                    onChange={(e) => handleMarketPriceChange(e.target.value)}
-                    placeholder="0"
-                    className="w-24 bg-transparent text-right text-xs text-amber-400 font-bold focus:outline-none font-mono"
-                  />
-                  <span className="text-xs text-slate-500">k</span>
-                </div>
-
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg">
-                  <span className="text-xs text-slate-400 font-medium">Quantité :</span>
-                  <input
-                    type="number"
-                    min="1"
-                    value={desiredQuantity}
-                    onChange={(e) => setDesiredQuantity(Math.max(1, Number(e.target.value)))}
-                    className="w-12 bg-transparent text-center text-xs text-amber-400 font-bold focus:outline-none font-mono"
-                  />
-                </div>
-
-                <button
-                  onClick={() => toggleFavorite(selectedItem)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition border cursor-pointer ${
-                    isCurrentFav
-                      ? 'bg-amber-500 text-slate-950 border-amber-400'
-                      : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800'
-                  }`}
-                >
-                  {isCurrentFav ? '★ En favoris' : '☆ Ajouter aux favoris'}
-                </button>
+              <div>
+                <h2 className="text-lg font-bold text-slate-100">
+                  {selectedItem ? getName(selectedItem) : 'Sélectionnez un équipement'}
+                </h2>
+                <p className="text-xs text-amber-500 font-mono">
+                  {selectedItem ? `Niveau ${selectedItem.level || '?'}` : 'Recherchez un item ci-dessus'}
+                </p>
               </div>
             </div>
 
-            {/* TABLEAU DE RECETTE DÉTAILLÉE */}
-            <div>
-              <div className="text-xs font-bold text-amber-500 uppercase tracking-wider mb-2">
-                ▸ RECETTE D'OBTENTION
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg">
+                <span className="text-xs text-slate-400 font-medium">Prix HDV :</span>
+                <input
+                  type="number"
+                  disabled={!selectedItem}
+                  value={marketPrice || ''}
+                  onChange={(e) => handleMarketPriceChange(e.target.value)}
+                  placeholder="0"
+                  className="w-24 bg-transparent text-right text-xs text-amber-400 font-bold focus:outline-none font-mono disabled:opacity-50"
+                />
+                <span className="text-xs text-slate-500">k</span>
               </div>
 
-              {recipe.length === 0 ? (
-                <div className="text-xs text-slate-500 italic p-3 text-center border border-dashed border-slate-800 rounded-lg">
-                  Aucune recette disponible pour cet équipement.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
-                        <th className="py-2 px-3 font-semibold">Ingrédient</th>
-                        <th className="py-2 px-3 font-semibold text-center w-24">Quantité (x1)</th>
-                        <th className="py-2 px-3 font-semibold text-center w-28">Total (x{targetQty})</th>
-                        <th className="py-2 px-3 font-semibold text-right w-36">Prix unitaire</th>
-                        <th className="py-2 px-3 font-semibold text-right w-36">Coût Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60 font-mono">
-                      {recipe.map((ing, idx) => {
-                        const ingId = getIngredientId(ing);
-                        const ingName = getName(ing);
-                        const ingIcon = getItemIcon(ing);
-                        const unitQty = ing.quantity || 1;
-                        const totalQty = unitQty * targetQty;
-                        const unitPrice = ingredientPrices[ingId] || 0;
-                        const totalPrice = unitPrice * totalQty;
+              <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg">
+                <span className="text-xs text-slate-400 font-medium">Quantité :</span>
+                <input
+                  type="number"
+                  min="1"
+                  disabled={!selectedItem}
+                  value={desiredQuantity}
+                  onChange={(e) => setDesiredQuantity(Math.max(1, Number(e.target.value)))}
+                  className="w-12 bg-transparent text-center text-xs text-amber-400 font-bold focus:outline-none font-mono disabled:opacity-50"
+                />
+              </div>
 
-                        return (
-                          <tr key={ingId || idx} className="hover:bg-slate-800/40 transition">
-                            <td className="py-2 px-3 font-sans text-slate-200">
-                              <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 p-0.5">
-                                  {ingIcon ? (
-                                    <img src={ingIcon} alt={ingName} className="w-4 h-4 object-contain" />
-                                  ) : (
-                                    <span className="text-[10px]">🪵</span>
-                                  )}
-                                </div>
-                                <span>{ingName}</span>
+              <button
+                disabled={!selectedItem}
+                onClick={() => toggleFavorite(selectedItem)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isCurrentFav
+                    ? 'bg-amber-500 text-slate-950 border-amber-400'
+                    : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800'
+                }`}
+              >
+                {isCurrentFav ? '★ En favoris' : '☆ Ajouter aux favoris'}
+              </button>
+            </div>
+          </div>
+
+          {/* TABLEAU DE RECETTE DÉTAILLÉE */}
+          <div>
+            <div className="text-xs font-bold text-amber-500 uppercase tracking-wider mb-2">
+              ▸ RECETTE D'OBTENTION
+            </div>
+
+            {!selectedItem ? (
+              <div className="text-xs text-slate-500 italic p-3 text-center border border-dashed border-slate-800 rounded-lg">
+                Recherchez et sélectionnez un équipement pour afficher sa recette.
+              </div>
+            ) : recipe.length === 0 ? (
+              <div className="text-xs text-slate-500 italic p-3 text-center border border-dashed border-slate-800 rounded-lg">
+                Aucune recette disponible pour cet équipement.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
+                      <th className="py-2 px-3 font-semibold">Ingrédient</th>
+                      <th className="py-2 px-3 font-semibold text-center w-24">Quantité (x1)</th>
+                      <th className="py-2 px-3 font-semibold text-center w-28">Total (x{targetQty})</th>
+                      <th className="py-2 px-3 font-semibold text-right w-36">Prix unitaire</th>
+                      <th className="py-2 px-3 font-semibold text-right w-36">Coût Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono">
+                    {recipe.map((ing, idx) => {
+                      const ingId = getIngredientId(ing);
+                      const fallbackRes = fetchedResources[ingId] || {};
+
+                      const ingName = getName(ing) !== 'Inconnu'
+                        ? getName(ing)
+                        : getName(fallbackRes);
+
+                      const ingIcon = getItemIcon(ing) || getItemIcon(fallbackRes);
+
+                      const unitQty = ing.quantity || 1;
+                      const totalQty = unitQty * targetQty;
+                      const unitPrice = ingredientPrices[ingId] || 0;
+                      const totalPrice = unitPrice * totalQty;
+
+                      return (
+                        <tr key={ingId || idx} className="hover:bg-slate-800/40 transition">
+                          <td className="py-2 px-3 font-sans text-slate-200">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 p-0.5">
+                                {ingIcon ? (
+                                  <img src={ingIcon} alt={ingName} className="w-4 h-4 object-contain" />
+                                ) : (
+                                  <span className="text-[10px]">🪵</span>
+                                )}
                               </div>
-                            </td>
-                            <td className="py-2 px-3 text-center text-slate-400">x{unitQty}</td>
-                            <td className="py-2 px-3 text-center text-amber-400 font-bold">x{totalQty}</td>
-                            <td className="py-2 px-3 text-right text-slate-400">
-                              {unitPrice > 0 ? `${unitPrice.toLocaleString()} k` : '-'}
-                            </td>
-                            <td className="py-2 px-3 text-right text-slate-200 font-bold">
-                              {totalPrice > 0 ? `${totalPrice.toLocaleString()} k` : '0 k'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
+                              <span>{ingName}</span>
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-center text-slate-400">x{unitQty}</td>
+                          <td className="py-2 px-3 text-center text-amber-400 font-bold">x{totalQty}</td>
+                          <td className="py-2 px-3 text-right text-slate-400">
+                            {unitPrice > 0 ? `${unitPrice.toLocaleString()} k` : '-'}
+                          </td>
+                          <td className="py-2 px-3 text-right text-slate-200 font-bold">
+                            {totalPrice > 0 ? `${totalPrice.toLocaleString()} k` : '0 k'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
 
-        {/* BILAN FINANCIER COMPLET */}
-        {selectedItem && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 shadow-lg">
-            <div className="text-xs font-bold text-amber-500 uppercase tracking-wider">
-              ▸ BILAN FINANCIER & RENTABILITÉ
-            </div>
+        </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
-                    <th className="py-2 px-3 font-semibold">Indicateur</th>
-                    <th className="py-2 px-3 font-semibold text-right w-44">Pour 1 unité (x1)</th>
-                    <th className="py-2 px-3 font-semibold text-right w-44 text-amber-400 bg-amber-950/10">
-                      Pour {targetQty} unité{targetQty > 1 ? 's' : ''} (x{targetQty})
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono">
-                  
-                  {/* COÛT CRAFT */}
-                  <tr className="hover:bg-slate-800/30">
-                    <td className="py-2.5 px-3 font-sans text-slate-300">Coût de Craft Total</td>
-                    <td className="py-2.5 px-3 text-right text-slate-200 font-bold">{costX1.toLocaleString()} k</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-amber-400 bg-amber-950/10">{costXN.toLocaleString()} k</td>
-                  </tr>
-
-                  {/* REVENTE */}
-                  <tr className="hover:bg-slate-800/30">
-                    <td className="py-2.5 px-3 font-sans font-bold text-slate-200">Revente Total (HDV)</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-slate-100">{reventeX1.toLocaleString()} k</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-amber-400 bg-amber-950/10">{reventeXN.toLocaleString()} k</td>
-                  </tr>
-
-                  {/* MARGE BRUTE */}
-                  <tr className="hover:bg-slate-800/30">
-                    <td className="py-2.5 px-3 font-sans text-slate-400 italic">Marge Brute</td>
-                    <td className="py-2.5 px-3 text-right text-slate-300">{margeBruteX1.toLocaleString()} k</td>
-                    <td className="py-2.5 px-3 text-right text-slate-300 bg-amber-950/10">{margeBruteXN.toLocaleString()} k</td>
-                  </tr>
-
-                  {/* FM */}
-                  <tr className="hover:bg-slate-800/30">
-                    <td className="py-2.5 px-3 font-sans text-slate-400">Coût Forgemagie (FM)</td>
-                    <td className="py-2.5 px-3 text-right">
-                      <input
-                        type="number"
-                        value={fmCost || ''}
-                        onChange={(e) => setFmCost(Number(e.target.value))}
-                        placeholder="0"
-                        className="w-28 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded px-2 py-0.5 text-right text-xs text-amber-400 focus:outline-none font-mono"
-                      />
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-slate-300 bg-amber-950/10 font-bold">
-                      {fmCostXN.toLocaleString()} k
-                    </td>
-                  </tr>
-
-                  {/* TAXE 2% */}
-                  <tr className="hover:bg-slate-800/30">
-                    <td className="py-2.5 px-3 font-sans text-slate-400">Taxe HDV (2%)</td>
-                    <td className="py-2.5 px-3 text-right text-slate-400">{taxe2PercentX1.toLocaleString()} k</td>
-                    <td className="py-2.5 px-3 text-right text-slate-400 bg-amber-950/10">{taxe2PercentXN.toLocaleString()} k</td>
-                  </tr>
-
-                  {/* BÉNÉFICE NET */}
-                  <tr className="bg-slate-950 font-bold border-t border-slate-800">
-                    <td className="py-3 px-3 font-sans text-slate-100">Bénéfice Net (Marge Nette)</td>
-                    <td className="py-3 px-3 text-right">
-                      <span className={`inline-block px-2 py-0.5 rounded ${margeNetteX1 >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                        {margeNetteX1 >= 0 ? '+' : ''}{margeNetteX1.toLocaleString()} k
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-right bg-amber-950/20">
-                      <span className={`inline-block px-2 py-0.5 rounded ${margeNetteXN >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                        {margeNetteXN >= 0 ? '+' : ''}{margeNetteXN.toLocaleString()} k
-                      </span>
-                    </td>
-                  </tr>
-
-                  {/* TAUX DE MARGE */}
-                  <tr className="bg-slate-950/80 font-bold">
-                    <td className="py-3 px-3 font-sans text-slate-100">Taux de Marge</td>
-                    <td className={`py-3 px-3 text-right ${margeNetteX1 >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {tauxMargeX1}%
-                    </td>
-                    <td className={`py-3 px-3 text-right bg-amber-950/20 ${margeNetteXN >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {tauxMargeXN}%
-                    </td>
-                  </tr>
-
-                </tbody>
-              </table>
-            </div>
+        {/* BILAN FINANCIER COMPLET (TOUJOURS AFFICHÉ) */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 shadow-lg">
+          <div className="text-xs font-bold text-amber-500 uppercase tracking-wider">
+            ▸ BILAN FINANCIER & RENTABILITÉ
           </div>
-        )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
+                  <th className="py-2 px-3 font-semibold">Indicateur</th>
+                  <th className="py-2 px-3 font-semibold text-right w-44">Pour 1 unité (x1)</th>
+                  <th className="py-2 px-3 font-semibold text-right w-44 text-amber-400 bg-amber-950/10">
+                    Pour {targetQty} unité{targetQty > 1 ? 's' : ''} (x{targetQty})
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 font-mono">
+                
+                {/* COÛT CRAFT */}
+                <tr className="hover:bg-slate-800/30">
+                  <td className="py-2.5 px-3 font-sans text-slate-300">Coût de Craft Total</td>
+                  <td className="py-2.5 px-3 text-right text-slate-200 font-bold">{costX1.toLocaleString()} k</td>
+                  <td className="py-2.5 px-3 text-right font-bold text-amber-400 bg-amber-950/10">{costXN.toLocaleString()} k</td>
+                </tr>
+
+                {/* REVENTE */}
+                <tr className="hover:bg-slate-800/30">
+                  <td className="py-2.5 px-3 font-sans font-bold text-slate-200">Revente Total (HDV)</td>
+                  <td className="py-2.5 px-3 text-right font-bold text-slate-100">{reventeX1.toLocaleString()} k</td>
+                  <td className="py-2.5 px-3 text-right font-bold text-amber-400 bg-amber-950/10">{reventeXN.toLocaleString()} k</td>
+                </tr>
+
+                {/* MARGE BRUTE */}
+                <tr className="hover:bg-slate-800/30">
+                  <td className="py-2.5 px-3 font-sans text-slate-400 italic">Marge Brute</td>
+                  <td className="py-2.5 px-3 text-right text-slate-300">{margeBruteX1.toLocaleString()} k</td>
+                  <td className="py-2.5 px-3 text-right text-slate-300 bg-amber-950/10">{margeBruteXN.toLocaleString()} k</td>
+                </tr>
+
+                {/* FM */}
+                <tr className="hover:bg-slate-800/30">
+                  <td className="py-2.5 px-3 font-sans text-slate-400">Coût Forgemagie (FM)</td>
+                  <td className="py-2.5 px-3 text-right">
+                    <input
+                      type="number"
+                      disabled={!selectedItem}
+                      value={fmCost || ''}
+                      onChange={(e) => setFmCost(Number(e.target.value))}
+                      placeholder="0"
+                      className="w-28 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded px-2 py-0.5 text-right text-xs text-amber-400 focus:outline-none font-mono disabled:opacity-50"
+                    />
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-slate-300 bg-amber-950/10 font-bold">
+                    {fmCostXN.toLocaleString()} k
+                  </td>
+                </tr>
+
+                {/* TAXE 2% */}
+                <tr className="hover:bg-slate-800/30">
+                  <td className="py-2.5 px-3 font-sans text-slate-400">Taxe HDV (2%)</td>
+                  <td className="py-2.5 px-3 text-right text-slate-400">{taxe2PercentX1.toLocaleString()} k</td>
+                  <td className="py-2.5 px-3 text-right text-slate-400 bg-amber-950/10">{taxe2PercentXN.toLocaleString()} k</td>
+                </tr>
+
+                {/* BÉNÉFICE NET */}
+                <tr className="bg-slate-950 font-bold border-t border-slate-800">
+                  <td className="py-3 px-3 font-sans text-slate-100">Bénéfice Net (Marge Nette)</td>
+                  <td className="py-3 px-3 text-right">
+                    <span className={`inline-block px-2 py-0.5 rounded ${margeNetteX1 >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                      {margeNetteX1 >= 0 ? '+' : ''}{margeNetteX1.toLocaleString()} k
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-right bg-amber-950/20">
+                    <span className={`inline-block px-2 py-0.5 rounded ${margeNetteXN >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                      {margeNetteXN >= 0 ? '+' : ''}{margeNetteXN.toLocaleString()} k
+                    </span>
+                  </td>
+                </tr>
+
+                {/* TAUX DE MARGE */}
+                <tr className="bg-slate-950/80 font-bold">
+                  <td className="py-3 px-3 font-sans text-slate-100">Taux de Marge</td>
+                  <td className={`py-3 px-3 text-right ${margeNetteX1 >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {tauxMargeX1}%
+                  </td>
+                  <td className={`py-3 px-3 text-right bg-amber-950/20 ${margeNetteXN >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {tauxMargeXN}%
+                  </td>
+                </tr>
+
+              </tbody>
+            </table>
+          </div>
+        </div>
 
       </div>
     </div>
