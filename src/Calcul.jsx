@@ -82,14 +82,14 @@ export default function Calcul({ onNavigate }) {
       }
     }
 
-    // 3. Charger le catalogue des équipements et sélectionner le 1er automatiquement
+    // 3. Charger le catalogue des équipements
     fetch('https://api.dofusdu.de/dofus3/v1/fr/items/equipment/all')
       .then((res) => res.json())
       .then((data) => {
         const list = Array.isArray(data) ? data : data.items || [];
         setEquipments(list);
         if (list.length > 0) {
-          setSelectedItem(list[0]); // Sélectionne le 1er équipement par défaut
+          setSelectedItem(list[0]); // Sélectionne le 1er équipement automatiquement au démarrage
         }
         setLoading(false);
       })
@@ -114,7 +114,7 @@ export default function Calcul({ onNavigate }) {
       setMarketPrice(0);
     }
 
-    // Vérifier si des ingrédients ont des noms inconnus et charger les ressources si besoin
+    // Charger ressources de secours si besoin
     const recipeList = Array.isArray(selectedItem.recipe)
       ? selectedItem.recipe
       : Array.isArray(selectedItem.recipe?.ingredients)
@@ -231,7 +231,7 @@ export default function Calcul({ onNavigate }) {
           onNavigate={onNavigate}
         />
 
-        {/* BARRE DE RECHERCHE */}
+        {/* 1. BARRE DE RECHERCHE (STRICTEMENT ISOLÉE) */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 shadow-lg">
           <label className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
             🔍 Rechercher un équipement
@@ -244,6 +244,7 @@ export default function Calcul({ onNavigate }) {
             className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none transition"
           />
 
+          {/* DÉROULANT DES RÉSULTATS DE RECHERCHE */}
           {searchQuery.trim() !== '' && (
             <div className="max-h-56 overflow-y-auto divide-y divide-slate-800 border border-slate-800 rounded-xl bg-slate-950 mt-2">
               {filteredEquipments.length === 0 ? (
@@ -283,15 +284,13 @@ export default function Calcul({ onNavigate }) {
         </div>
 
         {loading && (
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center text-amber-400 font-semibold animate-pulse text-xs">
-            Chargement de la base de données...
+          <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-center text-amber-400 font-semibold animate-pulse text-xs">
+            Chargement des équipements...
           </div>
         )}
 
-        {/* ÉQUIPEMENT SÉLECTIONNÉ & RECETTE (TOUJOURS AFFICHÉ) */}
+        {/* 2. ÉQUIPEMENT SÉLECTIONNÉ & RECETTE (TOUJOURS AFFICHÉ EN DEHORS DE LA RECHERCHE) */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4 shadow-lg">
-          
-          {/* ENTÊTE DE L'ÉQUIPEMENT */}
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center p-1.5 shrink-0">
@@ -303,10 +302,10 @@ export default function Calcul({ onNavigate }) {
               </div>
               <div>
                 <h2 className="text-lg font-bold text-slate-100">
-                  {selectedItem ? getName(selectedItem) : 'Aucun équipement sélectionné'}
+                  {selectedItem ? getName(selectedItem) : 'Aucun objet sélectionné'}
                 </h2>
                 <p className="text-xs text-amber-500 font-mono">
-                  {selectedItem ? `Niveau ${selectedItem.level || '?'}` : 'Recherchez un objet dans la barre ci-dessus'}
+                  {selectedItem ? `Niveau ${selectedItem.level || '?'}` : 'Sélectionnez un item ci-dessus'}
                 </p>
               </div>
             </div>
@@ -351,7 +350,6 @@ export default function Calcul({ onNavigate }) {
             </div>
           </div>
 
-          {/* TABLEAU DE RECETTE DÉTAILLÉE */}
           <div>
             <div className="text-xs font-bold text-amber-500 uppercase tracking-wider mb-2">
               ▸ RECETTE D'OBTENTION
@@ -423,10 +421,9 @@ export default function Calcul({ onNavigate }) {
               </div>
             )}
           </div>
-
         </div>
 
-        {/* BILAN FINANCIER COMPLET (TOUJOURS AFFICHÉ) */}
+        {/* 3. BILAN FINANCIER COMPLET (TOUJOURS AFFICHÉ) */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 shadow-lg">
           <div className="text-xs font-bold text-amber-500 uppercase tracking-wider">
             ▸ BILAN FINANCIER & RENTABILITÉ
@@ -508,7 +505,7 @@ export default function Calcul({ onNavigate }) {
 
                 {/* TAUX DE MARGE */}
                 <tr className="bg-slate-950/80 font-bold">
-                  <td className="py-3 px-3 font-sans text-slate-100">Taux de Marge Nette</td>
+                  <td className="py-3 px-3 font-sans text-slate-100">Taux de Marge</td>
                   <td className={`py-3 px-3 text-right ${margeNetteX1 >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {tauxMargeX1}%
                   </td>
