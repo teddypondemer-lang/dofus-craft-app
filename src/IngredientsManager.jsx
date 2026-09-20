@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import NavigationHeader from './NavigationHeader';
 
-// Formate la date de mise à jour
+// Formate la date de mise à jour au format JJ/MM à HH:mm
 const formatDate = (isoString) => {
   if (!isoString) return 'Jamais';
   try {
@@ -17,7 +17,7 @@ const formatDate = (isoString) => {
   }
 };
 
-// Extraction sécurisée du nom (gère toutes les structures d'objets Dofus)
+// Extraction sécurisée du nom
 const getName = (obj) => {
   if (!obj) return 'Ressource inconnue';
   if (typeof obj === 'string') return obj;
@@ -52,6 +52,7 @@ const getItemIcon = (obj) => {
   );
 };
 
+// Extraction de l'ID d'un ingrédient
 const getIngredientId = (ing) => {
   if (!ing) return null;
   return ing.item_ankama_id || ing.ankama_id || ing.id || ing.item_id;
@@ -64,7 +65,7 @@ export default function IngredientsManager({ onNavigate }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Récupération des prix enregistrés dans LocalStorage
+    // 1. Récupération des prix enregistrés
     const savedPrices = localStorage.getItem('dofus_ingredient_prices');
     if (savedPrices) {
       try {
@@ -84,12 +85,12 @@ export default function IngredientsManager({ onNavigate }) {
         favs.forEach((item) => {
           if (!item) return;
 
-          const recipe = Array.isArray(item.recipe) 
-            ? item.recipe 
-            : Array.isArray(item.recipe?.ingredients) 
-              ? item.recipe.ingredients 
-              : Array.isArray(item.ingredients) 
-                ? item.ingredients 
+          const recipe = Array.isArray(item.recipe)
+            ? item.recipe
+            : Array.isArray(item.recipe?.ingredients)
+              ? item.recipe.ingredients
+              : Array.isArray(item.ingredients)
+                ? item.ingredients
                 : [];
 
           recipe.forEach((ing) => {
@@ -104,7 +105,7 @@ export default function IngredientsManager({ onNavigate }) {
         const list = Array.from(uniqueIngredientsMap.values());
         setIngredientsList(list);
 
-        // Si des ressources ont un nom ou une icône manquant, charger le catalogue global des ressources
+        // Si certaines ressources n'ont pas de nom/icône complets, charger l'API ressources
         const hasMissingInfo = list.some((ing) => getName(ing) === 'Ressource inconnue' || !getItemIcon(ing));
 
         if (hasMissingInfo) {
@@ -136,6 +137,7 @@ export default function IngredientsManager({ onNavigate }) {
     }
   }, []);
 
+  // Mise à jour du prix d'un ingrédient + stockage de la date
   const handlePriceChange = (ingId, newPrice) => {
     const val = newPrice === '' ? 0 : Number(newPrice);
     const updated = {
@@ -162,12 +164,13 @@ export default function IngredientsManager({ onNavigate }) {
           onNavigate={onNavigate}
         />
 
+        {/* CONTENU PRINCIPAL */}
         {loading ? (
           <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center text-amber-400 font-semibold animate-pulse">
             Chargement des ressources...
           </div>
         ) : ingredientsList.length === 0 ? (
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center text-slate-500">
+          <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center text-slate-500 italic">
             Aucune ressource à afficher. Ajoutez d'abord des équipements à vos favoris.
           </div>
         ) : (
@@ -178,7 +181,6 @@ export default function IngredientsManager({ onNavigate }) {
                 const ingId = getIngredientId(ing) || idx;
                 const fallbackRes = fetchedResources[ingId] || {};
 
-                // Tente de récupérer le nom/icône via l'ingrédient ou via le catalogue d'API complémentaire
                 const displayName = getName(ing) !== 'Ressource inconnue'
                   ? getName(ing)
                   : getName(fallbackRes);
@@ -193,6 +195,7 @@ export default function IngredientsManager({ onNavigate }) {
                     key={ingId}
                     className="flex items-center justify-between p-3.5 hover:bg-slate-800/40 transition gap-4"
                   >
+                    {/* Icône + Nom + Date de MAJ */}
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-10 h-10 rounded bg-slate-950 border border-slate-800 flex items-center justify-center p-1 shrink-0">
                         {ingIcon ? (
@@ -213,15 +216,16 @@ export default function IngredientsManager({ onNavigate }) {
                       </div>
                     </div>
 
+                    {/* Saisie du prix */}
                     <div className="flex items-center gap-2 shrink-0">
                       <input
                         type="number"
                         value={currentPrice}
                         onChange={(e) => handlePriceChange(ingId, e.target.value)}
                         placeholder="Prix unitaire"
-                        className="w-32 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-right text-xs text-amber-400 font-mono focus:outline-none focus:border-amber-500"
+                        className="w-32 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-lg px-3 py-1.5 text-right text-xs text-amber-400 font-mono focus:outline-none transition"
                       />
-                      <span className="text-xs text-slate-500 font-bold">K</span>
+                      <span className="text-xs text-slate-500 font-bold">k</span>
                     </div>
                   </div>
                 );
@@ -229,6 +233,7 @@ export default function IngredientsManager({ onNavigate }) {
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import NavigationHeader from './NavigationHeader';
 
+// Extraction sécurisée du nom de l'équipement
 const getName = (obj) => {
   if (!obj) return 'Inconnu';
   if (typeof obj === 'string') return obj;
@@ -10,6 +11,7 @@ const getName = (obj) => {
   return obj.fr || obj.en || 'Inconnu';
 };
 
+// Extraction sécurisée de l'icône
 const getItemIcon = (obj) => {
   if (!obj) return null;
   return (
@@ -24,6 +26,7 @@ const getItemIcon = (obj) => {
   );
 };
 
+// Extraction de l'ID de ressource
 const getIngredientId = (ing) => {
   if (!ing) return null;
   return ing.item_ankama_id || ing.ankama_id || ing.id || ing.item_id;
@@ -72,7 +75,7 @@ export default function FavoritesTable({ onNavigate }) {
     }
   }, []);
 
-  // Mettre à jour le prix HDV d'un équipement directement depuis les favoris
+  // Mettre à jour le prix HDV d'un équipement directement depuis le tableau
   const handlePriceChange = (itemId, val) => {
     const num = val === '' ? 0 : Number(val);
     const updated = { ...equipmentPrices, [itemId]: num };
@@ -80,20 +83,21 @@ export default function FavoritesTable({ onNavigate }) {
     localStorage.setItem('dofus_equipment_prices', JSON.stringify(updated));
   };
 
-  // Copier le nom de l'équipement dans le presse-papier pour la recherche en jeu
+  // Copier le nom dans le presse-papier pour la recherche en jeu
   const copyToClipboard = (name, id) => {
     navigator.clipboard.writeText(name);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 1500);
   };
 
+  // Retirer un équipement des favoris
   const removeFavorite = (itemId) => {
     const updated = favorites.filter((item) => (item.ankama_id || item.id) !== itemId);
     setFavorites(updated);
     localStorage.setItem('dofus_favorites', JSON.stringify(updated));
   };
 
-  // Calculer le coût du craft d'un équipement
+  // Calculer le coût total du craft
   const calculateCraftCost = (item) => {
     const recipe = Array.isArray(item.recipe)
       ? item.recipe
@@ -114,19 +118,22 @@ export default function FavoritesTable({ onNavigate }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
       <div className="max-w-5xl mx-auto space-y-6">
+        
+        {/* BARRE DE NAVIGATION */}
         <NavigationHeader
           title="💸 Suivi des Ventes & Rentabilité"
           currentView="favoris"
           onNavigate={onNavigate}
         />
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+        {/* TABLEAU DES FAVORIS */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 shadow-lg">
           <div className="text-xs font-bold text-amber-500 uppercase tracking-wider">
             ▸ ÉQUIPEMENTS SUIVIS
           </div>
 
           {favorites.length === 0 ? (
-            <div className="text-xs text-slate-500 italic p-4 text-center border border-dashed border-slate-800 rounded-lg">
+            <div className="text-xs text-slate-500 italic p-6 text-center border border-dashed border-slate-800 rounded-lg">
               Aucun équipement favori. Ajoutez-en depuis l'onglet Calcul.
             </div>
           ) : (
@@ -155,7 +162,8 @@ export default function FavoritesTable({ onNavigate }) {
 
                     return (
                       <tr key={itemId} className="hover:bg-slate-800/40 transition">
-                        {/* Nom + Copier */}
+                        
+                        {/* Nom + Icône + Copier */}
                         <td className="py-2.5 px-3 font-sans font-medium text-slate-200">
                           <div className="flex items-center gap-2.5">
                             <div className="w-7 h-7 rounded bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 p-0.5">
@@ -181,7 +189,7 @@ export default function FavoritesTable({ onNavigate }) {
                           {item.level || '?'}
                         </td>
 
-                        {/* Prix HDV modifiable */}
+                        {/* Prix HDV éditable */}
                         <td className="py-2.5 px-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <input
@@ -189,18 +197,18 @@ export default function FavoritesTable({ onNavigate }) {
                               value={equipmentPrices[itemId] || ''}
                               onChange={(e) => handlePriceChange(itemId, e.target.value)}
                               placeholder="0"
-                              className="w-28 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded px-2 py-1 text-right text-xs text-amber-400 focus:outline-none font-bold"
+                              className="w-28 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded px-2 py-1 text-right text-xs text-amber-400 focus:outline-none font-bold font-mono"
                             />
                             <span className="text-slate-500 text-[10px]">k</span>
                           </div>
                         </td>
 
-                        {/* Coût Craft calculé automatiquement */}
+                        {/* Coût Craft calculé */}
                         <td className="py-2.5 px-3 text-right text-slate-300">
-                          {craftCost.toLocaleString()} k
+                          {craftCost > 0 ? `${craftCost.toLocaleString()} k` : '-'}
                         </td>
 
-                        {/* Bénéfice avec code couleur */}
+                        {/* Bénéfice Net */}
                         <td className="py-2.5 px-3 text-right">
                           <span
                             className={`inline-block px-2 py-0.5 rounded font-bold ${
@@ -234,6 +242,7 @@ export default function FavoritesTable({ onNavigate }) {
             </div>
           )}
         </div>
+
       </div>
     </div>
   );
