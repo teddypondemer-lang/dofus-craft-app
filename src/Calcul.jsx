@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import NavigationHeader from './NavigationHeader';
 
+// Extraction sécurisée du nom de l'item ou de la ressource
 const getName = (obj) => {
   if (!obj) return 'Inconnu';
   if (typeof obj === 'string') return obj;
@@ -20,6 +21,7 @@ const getName = (obj) => {
   return 'Inconnu';
 };
 
+// Extraction sécurisée de l'icône de l'objet
 const getItemIcon = (obj) => {
   if (!obj) return null;
   return (
@@ -34,6 +36,7 @@ const getItemIcon = (obj) => {
   );
 };
 
+// Extraction de l'ID Ankama/Dofus
 const getIngredientId = (ing) => {
   if (!ing) return null;
   return ing.item_ankama_id || ing.ankama_id || ing.id || ing.item_id;
@@ -46,7 +49,7 @@ export default function Calcul({ onNavigate }) {
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Prix unitaires des ingrédients
+  // Stockage des prix unitaires des ingrédients
   const [ingredientPrices, setIngredientPrices] = useState({});
 
   // Paramètres de calcul
@@ -55,7 +58,7 @@ export default function Calcul({ onNavigate }) {
   const [fmCost, setFmCost] = useState(0);
 
   useEffect(() => {
-    // 1. Favoris
+    // 1. Charger les favoris
     const savedFavs = localStorage.getItem('dofus_favorites');
     if (savedFavs) {
       try {
@@ -65,7 +68,7 @@ export default function Calcul({ onNavigate }) {
       }
     }
 
-    // 2. Prix ingrédients
+    // 2. Charger les prix des ingrédients
     const savedPrices = localStorage.getItem('dofus_ingredient_prices');
     if (savedPrices) {
       try {
@@ -80,7 +83,7 @@ export default function Calcul({ onNavigate }) {
       }
     }
 
-    // 3. Charger équipements
+    // 3. Charger le catalogue des équipements
     fetch('https://api.dofusdu.de/dofus3/v1/fr/items/equipment/all')
       .then((res) => res.json())
       .then((data) => {
@@ -94,7 +97,7 @@ export default function Calcul({ onNavigate }) {
       });
   }, []);
 
-  // Synchronisation du prix HDV lors du changement de sélection
+  // Synchroniser le prix HDV sauvegardé quand un équipement est sélectionné
   useEffect(() => {
     if (!selectedItem) {
       setMarketPrice(0);
@@ -110,7 +113,7 @@ export default function Calcul({ onNavigate }) {
     }
   }, [selectedItem]);
 
-  // Enregistrement du prix HDV
+  // Sauvegarder le prix HDV dans LocalStorage lors de la saisie
   const handleMarketPriceChange = (val) => {
     const num = val === '' ? 0 : Number(val);
     setMarketPrice(num);
@@ -123,6 +126,7 @@ export default function Calcul({ onNavigate }) {
     }
   };
 
+  // Basculer l'état favori d'un équipement
   const toggleFavorite = (item) => {
     if (!item) return;
     const itemId = item.ankama_id || item.id;
@@ -150,7 +154,7 @@ export default function Calcul({ onNavigate }) {
     setDesiredQuantity(1);
   };
 
-  // Récupération de la liste des ingrédients de la recette
+  // Extraction propre des ingrédients de la recette
   const recipe = selectedItem
     ? Array.isArray(selectedItem.recipe)
       ? selectedItem.recipe
@@ -161,7 +165,7 @@ export default function Calcul({ onNavigate }) {
           : []
     : [];
 
-  // Calculs financiers
+  // Calculs financiers (Pour 1 Unité)
   const costX1 = recipe.reduce((acc, ing) => {
     const id = getIngredientId(ing);
     const unitP = ingredientPrices[id] || 0;
@@ -170,14 +174,14 @@ export default function Calcul({ onNavigate }) {
   }, 0);
 
   const targetQty = desiredQuantity > 0 ? desiredQuantity : 1;
-  const costXN = costX1 * targetQty;
-
   const reventeX1 = marketPrice;
   const margeBruteX1 = reventeX1 - costX1;
   const taxe2PercentX1 = Math.round(reventeX1 * 0.02);
   const margeNetteX1 = margeBruteX1 - fmCost - taxe2PercentX1;
   const tauxMargeX1 = costX1 > 0 ? ((margeNetteX1 / costX1) * 100).toFixed(0) : 0;
 
+  // Calculs financiers (Pour N Unités)
+  const costXN = costX1 * targetQty;
   const reventeXN = reventeX1 * targetQty;
   const margeBruteXN = margeBruteX1 * targetQty;
   const fmCostXN = fmCost * targetQty;
@@ -200,8 +204,8 @@ export default function Calcul({ onNavigate }) {
           onNavigate={onNavigate}
         />
 
-        {/* RECHERCHE */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+        {/* BARRE DE RECHERCHE */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 shadow-lg">
           <label className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
             🔍 Rechercher un équipement
           </label>
@@ -209,7 +213,7 @@ export default function Calcul({ onNavigate }) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tapez le nom d'un équipement..."
+            placeholder="Tapez le nom d'un équipement (ex: Voile d'Encre)..."
             className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none transition"
           />
 
@@ -259,7 +263,7 @@ export default function Calcul({ onNavigate }) {
 
         {/* ÉQUIPEMENT SÉLECTIONNÉ & RECETTE */}
         {selectedItem && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4 shadow-lg">
             
             {/* ENTÊTE DE L'ÉQUIPEMENT */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -277,7 +281,7 @@ export default function Calcul({ onNavigate }) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg">
                   <span className="text-xs text-slate-400 font-medium">Prix HDV :</span>
                   <input
@@ -285,7 +289,7 @@ export default function Calcul({ onNavigate }) {
                     value={marketPrice || ''}
                     onChange={(e) => handleMarketPriceChange(e.target.value)}
                     placeholder="0"
-                    className="w-24 bg-transparent text-right text-xs text-amber-400 font-bold focus:outline-none"
+                    className="w-24 bg-transparent text-right text-xs text-amber-400 font-bold focus:outline-none font-mono"
                   />
                   <span className="text-xs text-slate-500">k</span>
                 </div>
@@ -297,7 +301,7 @@ export default function Calcul({ onNavigate }) {
                     min="1"
                     value={desiredQuantity}
                     onChange={(e) => setDesiredQuantity(Math.max(1, Number(e.target.value)))}
-                    className="w-12 bg-transparent text-center text-xs text-amber-400 font-bold focus:outline-none"
+                    className="w-12 bg-transparent text-center text-xs text-amber-400 font-bold focus:outline-none font-mono"
                   />
                 </div>
 
@@ -314,7 +318,7 @@ export default function Calcul({ onNavigate }) {
               </div>
             </div>
 
-            {/* TABLEAU DES RECETTES (DÉTAILLÉ) */}
+            {/* TABLEAU DE RECETTE DÉTAILLÉE */}
             <div>
               <div className="text-xs font-bold text-amber-500 uppercase tracking-wider mb-2">
                 ▸ RECETTE D'OBTENTION
@@ -382,7 +386,7 @@ export default function Calcul({ onNavigate }) {
 
         {/* BILAN FINANCIER COMPLET */}
         {selectedItem && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 shadow-lg">
             <div className="text-xs font-bold text-amber-500 uppercase tracking-wider">
               ▸ BILAN FINANCIER & RENTABILITÉ
             </div>
@@ -430,7 +434,7 @@ export default function Calcul({ onNavigate }) {
                         value={fmCost || ''}
                         onChange={(e) => setFmCost(Number(e.target.value))}
                         placeholder="0"
-                        className="w-28 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded px-2 py-0.5 text-right text-xs text-amber-400 focus:outline-none"
+                        className="w-28 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded px-2 py-0.5 text-right text-xs text-amber-400 focus:outline-none font-mono"
                       />
                     </td>
                     <td className="py-2.5 px-3 text-right text-slate-300 bg-amber-950/10 font-bold">
@@ -445,7 +449,7 @@ export default function Calcul({ onNavigate }) {
                     <td className="py-2.5 px-3 text-right text-slate-400 bg-amber-950/10">{taxe2PercentXN.toLocaleString()} k</td>
                   </tr>
 
-                  {/* BÉNÉFICE NET / PERTE (AVEC CODE COULEUR) */}
+                  {/* BÉNÉFICE NET */}
                   <tr className="bg-slate-950 font-bold border-t border-slate-800">
                     <td className="py-3 px-3 font-sans text-slate-100">Bénéfice Net (Marge Nette)</td>
                     <td className="py-3 px-3 text-right">
