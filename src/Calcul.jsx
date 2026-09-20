@@ -39,7 +39,7 @@ const getIngredientId = (ing) => {
   return ing.item_ankama_id || ing.ankama_id || ing.id || ing.item_id;
 };
 
-export default function EquipmentsTable({ onNavigate }) {
+export default function Calcul({ onNavigate }) {
   const [equipments, setEquipments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
