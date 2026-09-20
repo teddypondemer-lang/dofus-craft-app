@@ -1,28 +1,50 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import NavigationHeader from './NavigationHeader';
 
-// Objet factice par défaut pour forcer l'affichage immédiat
+// Objet par défaut pour forcer l'affichage des tableaux dès le premier chargement
 const DEFAULT_ITEM = {
   ankama_id: 0,
-  name: "Sélectionnez un équipement",
+  name: "Aucun équipement sélectionné",
   level: 0,
   recipe: []
 };
 
+// Extraction sécurisée du nom
 const getName = (obj) => {
-  if (!obj) return 'Sélectionnez un équipement';
+  if (!obj) return 'Non trouvé';
   if (typeof obj === 'string') return obj;
-  const raw = obj.item_name || obj.name || obj.title || (obj.item && (obj.item.name || obj.item.item_name));
+
+  const raw =
+    obj.item_name ||
+    obj.name ||
+    obj.title ||
+    (obj.item && (obj.item.name || obj.item.item_name));
+
   if (typeof raw === 'string') return raw;
-  if (typeof raw === 'object' && raw !== null) return raw.fr || raw.en || raw.name || 'Sélectionnez un équipement';
-  return obj.fr || obj.en || 'Sélectionnez un équipement';
+  if (typeof raw === 'object' && raw !== null) {
+    return raw.fr || raw.en || raw.de || raw.es || raw.name || 'Non trouvé';
+  }
+
+  if (obj.fr || obj.en) return obj.fr || obj.en;
+  return 'Non trouvé';
 };
 
+// Extraction sécurisée de l'icône
 const getItemIcon = (obj) => {
   if (!obj) return null;
-  return obj.item_icon_url || obj.image_urls?.icon || obj.image_url || obj.icon_url || (obj.item && (obj.item.item_icon_url || obj.item.image_urls?.icon)) || null;
+  return (
+    obj.item_icon_url ||
+    obj.image_urls?.icon ||
+    obj.image_url ||
+    obj.icon_url ||
+    obj.img ||
+    obj.image ||
+    (obj.item && (obj.item.item_icon_url || obj.item.image_urls?.icon)) ||
+    null
+  );
 };
 
+// Extraction de l'ID d'un ingrédient
 const getIngredientId = (ing) => {
   if (!ing) return null;
   return ing.item_ankama_id || ing.ankama_id || ing.id || ing.item_id;
@@ -31,53 +53,104 @@ const getIngredientId = (ing) => {
 export default function Calcul({ onNavigate }) {
   const [equipments, setEquipments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedItem, setSelectedItem] = useState(DEFAULT_ITEM); // Objet neutre par défaut
+  const [selectedItem, setSelectedItem] = useState(DEFAULT_ITEM);
   const [favorites, setFavorites] = useState([]);
   const [ingredientPrices, setIngredientPrices] = useState({});
   const [fetchedResources, setFetchedResources] = useState({});
+  const [loading, setLoading] = useState(true);
 
+  // Paramètres de calcul
   const [desiredQuantity, setDesiredQuantity] = useState(1);
   const [marketPrice, setMarketPrice] = useState(0);
   const [fmCost, setFmCost] = useState(0);
 
   useEffect(() => {
+    // 1. Charger les favoris
     const savedFavs = localStorage.getItem('dofus_favorites');
     if (savedFavs) {
-      try { setFavorites(JSON.parse(savedFavs)); } catch (e) {}
+      try {
+        setFavorites(JSON.parse(savedFavs));
+      } catch (err) {
+        console.error('Erreur favoris :', err);
+      }
     }
 
+    // 2. Charger les prix des ingrédients
     const savedPrices = localStorage.getItem('dofus_ingredient_prices');
     if (savedPrices) {
       try {
         const parsed = JSON.parse(savedPrices);
-        const map = {};
-        Object.keys(parsed).forEach((k) => { map[k] = parsed[k]?.price || 0; });
-        setIngredientPrices(map);
-      } catch (e) {}
+        const pricesMap = {};
+        Object.keys(parsed).forEach((key) => {
+          pricesMap[key] = parsed[key]?.price || 0;
+        });
+        setIngredientPrices(pricesMap);
+      } catch (err) {
+        console.error('Erreur prix ingrédients :', err);
+      }
     }
 
+    // 3. Charger les équipements
     fetch('https://api.dofusdu.de/dofus3/v1/fr/items/equipment/all')
       .then((res) => res.json())
       .then((data) => {
         const list = Array.isArray(data) ? data : data.items || [];
         setEquipments(list);
+        setLoading(false);
       })
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        console.error('Erreur chargement équipements :', err);
+        setLoading(false);
+      });
   }, []);
 
+  // Synchroniser le prix HDV sauvegardé lors de la sélection
   useEffect(() => {
     if (!selectedItem || selectedItem.ankama_id === 0) {
       setMarketPrice(0);
       return;
     }
+
     const itemId = selectedItem.ankama_id || selectedItem.id;
     const savedEqPrices = JSON.parse(localStorage.getItem('dofus_equipment_prices') || '{}');
-    setMarketPrice(savedEqPrices[itemId] || 0);
+    if (savedEqPrices[itemId] !== undefined) {
+      setMarketPrice(savedEqPrices[itemId]);
+    } else {
+      setMarketPrice(0);
+    }
+
+    // Charger le dictionnaire de ressources si besoin
+    const recipeList = Array.isArray(selectedItem.recipe)
+      ? selectedItem.recipe
+      : Array.isArray(selectedItem.recipe?.ingredients)
+        ? selectedItem.recipe.ingredients
+        : Array.isArray(selectedItem.ingredients)
+          ? selectedItem.ingredients
+          : [];
+
+    const needsFallback = recipeList.some(
+      (ing) => getName(ing) === 'Non trouvé' || !getItemIcon(ing)
+    );
+
+    if (needsFallback && Object.keys(fetchedResources).length === 0) {
+      fetch('https://api.dofusdu.de/dofus3/v1/fr/items/resources/all')
+        .then((res) => res.json())
+        .then((data) => {
+          const resList = Array.isArray(data) ? data : data.items || [];
+          const map = {};
+          resList.forEach((resItem) => {
+            if (resItem.ankama_id) map[resItem.ankama_id] = resItem;
+          });
+          setFetchedResources(map);
+        })
+        .catch((err) => console.error('Erreur dictionnaire ressources :', err));
+    }
   }, [selectedItem]);
 
   const handleMarketPriceChange = (val) => {
     const num = val === '' ? 0 : Number(val);
     setMarketPrice(num);
+
     if (selectedItem && selectedItem.ankama_id !== 0) {
       const itemId = selectedItem.ankama_id || selectedItem.id;
       const savedEqPrices = JSON.parse(localStorage.getItem('dofus_equipment_prices') || '{}');
@@ -89,17 +162,23 @@ export default function Calcul({ onNavigate }) {
   const toggleFavorite = (item) => {
     if (!item || item.ankama_id === 0) return;
     const itemId = item.ankama_id || item.id;
-    const exists = favorites.some((f) => (f.ankama_id || f.id) === itemId);
-    const updated = exists
-      ? favorites.filter((f) => (f.ankama_id || f.id) !== itemId)
-      : [...favorites, item];
+    const exists = favorites.some((fav) => (fav.ankama_id || fav.id) === itemId);
+
+    let updated;
+    if (exists) {
+      updated = favorites.filter((fav) => (fav.ankama_id || fav.id) !== itemId);
+    } else {
+      updated = [...favorites, item];
+    }
+
     setFavorites(updated);
     localStorage.setItem('dofus_favorites', JSON.stringify(updated));
   };
 
-  const filteredEquipments = equipments.filter((item) =>
-    getName(item).toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredEquipments = equipments.filter((item) => {
+    const name = getName(item);
+    return name.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   const handleSelectItem = (item) => {
     setSelectedItem(item);
@@ -107,18 +186,22 @@ export default function Calcul({ onNavigate }) {
     setDesiredQuantity(1);
   };
 
-  const recipe = selectedItem && Array.isArray(selectedItem.recipe)
-    ? selectedItem.recipe
-    : selectedItem && Array.isArray(selectedItem.recipe?.ingredients)
-      ? selectedItem.recipe.ingredients
-      : selectedItem && Array.isArray(selectedItem.ingredients)
-        ? selectedItem.ingredients
-        : [];
+  // Extraction sécurisée de la recette avec useMemo
+  const recipe = useMemo(() => {
+    if (!selectedItem || selectedItem.ankama_id === 0) return [];
+    if (Array.isArray(selectedItem.recipe)) return selectedItem.recipe;
+    if (Array.isArray(selectedItem.recipe?.ingredients)) return selectedItem.recipe.ingredients;
+    if (Array.isArray(selectedItem.ingredients)) return selectedItem.ingredients;
+    return [];
+  }, [selectedItem]);
 
+  // Calculs financiers
   const targetQty = desiredQuantity > 0 ? desiredQuantity : 1;
   const costX1 = recipe.reduce((acc, ing) => {
     const id = getIngredientId(ing);
-    return acc + (ingredientPrices[id] || 0) * (ing.quantity || 1);
+    const unitP = ingredientPrices[id] || 0;
+    const qty = ing.quantity || 1;
+    return acc + unitP * qty;
   }, 0);
 
   const reventeX1 = marketPrice;
@@ -136,14 +219,14 @@ export default function Calcul({ onNavigate }) {
   const tauxMargeXN = costXN > 0 ? ((margeNetteXN / costXN) * 100).toFixed(0) : 0;
 
   const isCurrentFav = selectedItem && selectedItem.ankama_id !== 0
-    ? favorites.some((f) => (f.ankama_id || f.id) === (selectedItem.ankama_id || selectedItem.id))
+    ? favorites.some((fav) => (fav.ankama_id || fav.id) === (selectedItem.ankama_id || selectedItem.id))
     : false;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans w-full">
       <div className="max-w-5xl mx-auto space-y-6">
-
-        {/* NAVIGATION */}
+        
+        {/* BARRE DE NAVIGATION */}
         <NavigationHeader
           title="🛡️ Calculateur de Rentabilité"
           currentView="equipments"
@@ -201,12 +284,18 @@ export default function Calcul({ onNavigate }) {
           )}
         </div>
 
-        {/* SECTION ÉQUIPEMENT & RECETTE */}
+        {loading && (
+          <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-center text-amber-400 font-semibold animate-pulse text-xs">
+            Chargement des données...
+          </div>
+        )}
+
+        {/* SECTION ÉQUIPEMENT SÉLECTIONNÉ (TOUJOURS AFFICHÉE) */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4 shadow-lg">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center p-1.5 shrink-0">
-                {selectedItem && getItemIcon(selectedItem) ? (
+                {selectedItem && selectedItem.ankama_id !== 0 && getItemIcon(selectedItem) ? (
                   <img src={getItemIcon(selectedItem)} alt={getName(selectedItem)} className="w-9 h-9 object-contain" />
                 ) : (
                   <span className="text-xl">🛡️</span>
@@ -217,7 +306,7 @@ export default function Calcul({ onNavigate }) {
                   {getName(selectedItem)}
                 </h2>
                 <p className="text-xs text-amber-500 font-mono">
-                  {selectedItem && selectedItem.level ? `Niveau ${selectedItem.level}` : 'Aucun équipement sélectionné'}
+                  {selectedItem && selectedItem.level ? `Niveau ${selectedItem.level}` : 'Recherchez un objet ci-dessus'}
                 </p>
               </div>
             </div>
@@ -269,7 +358,7 @@ export default function Calcul({ onNavigate }) {
 
             {recipe.length === 0 ? (
               <div className="text-xs text-slate-500 italic p-4 text-center border border-dashed border-slate-800 rounded-lg">
-                Aucune recette à afficher. Veuillez rechercher un équipement ci-dessus.
+                Non trouvé / Aucun équipement sélectionné.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -286,8 +375,14 @@ export default function Calcul({ onNavigate }) {
                   <tbody className="divide-y divide-slate-800/60 font-mono">
                     {recipe.map((ing, idx) => {
                       const ingId = getIngredientId(ing);
-                      const ingName = getName(ing);
-                      const ingIcon = getItemIcon(ing);
+                      const fallbackRes = fetchedResources[ingId] || {};
+
+                      const ingName = getName(ing) !== 'Non trouvé'
+                        ? getName(ing)
+                        : getName(fallbackRes);
+
+                      const ingIcon = getItemIcon(ing) || getItemIcon(fallbackRes);
+
                       const unitQty = ing.quantity || 1;
                       const totalQty = unitQty * targetQty;
                       const unitPrice = ingredientPrices[ingId] || 0;
@@ -325,7 +420,7 @@ export default function Calcul({ onNavigate }) {
           </div>
         </div>
 
-        {/* BILAN FINANCIER (INCONDITIONNEL) */}
+        {/* SECTION BILAN FINANCIER (TOUJOURS AFFICHÉE) */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 shadow-lg">
           <div className="text-xs font-bold text-amber-500 uppercase tracking-wider">
             ▸ BILAN FINANCIER & RENTABILITÉ
@@ -343,24 +438,29 @@ export default function Calcul({ onNavigate }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono">
+                
+                {/* COÛT CRAFT */}
                 <tr className="hover:bg-slate-800/30">
                   <td className="py-2.5 px-3 font-sans text-slate-300">Coût de Craft Total</td>
                   <td className="py-2.5 px-3 text-right text-slate-200 font-bold">{costX1.toLocaleString()} k</td>
                   <td className="py-2.5 px-3 text-right font-bold text-amber-400 bg-amber-950/10">{costXN.toLocaleString()} k</td>
                 </tr>
 
+                {/* REVENTE */}
                 <tr className="hover:bg-slate-800/30">
                   <td className="py-2.5 px-3 font-sans font-bold text-slate-200">Revente Total (HDV)</td>
                   <td className="py-2.5 px-3 text-right font-bold text-slate-100">{reventeX1.toLocaleString()} k</td>
                   <td className="py-2.5 px-3 text-right font-bold text-amber-400 bg-amber-950/10">{reventeXN.toLocaleString()} k</td>
                 </tr>
 
+                {/* MARGE BRUTE */}
                 <tr className="hover:bg-slate-800/30">
                   <td className="py-2.5 px-3 font-sans text-slate-400 italic">Marge Brute</td>
                   <td className="py-2.5 px-3 text-right text-slate-300">{margeBruteX1.toLocaleString()} k</td>
                   <td className="py-2.5 px-3 text-right text-slate-300 bg-amber-950/10">{margeBruteXN.toLocaleString()} k</td>
                 </tr>
 
+                {/* FORGEMAGIE */}
                 <tr className="hover:bg-slate-800/30">
                   <td className="py-2.5 px-3 font-sans text-slate-400">Coût Forgemagie (FM)</td>
                   <td className="py-2.5 px-3 text-right">
@@ -378,12 +478,14 @@ export default function Calcul({ onNavigate }) {
                   </td>
                 </tr>
 
+                {/* TAXE HDV */}
                 <tr className="hover:bg-slate-800/30">
                   <td className="py-2.5 px-3 font-sans text-slate-400">Taxe HDV (2%)</td>
                   <td className="py-2.5 px-3 text-right text-slate-400">{taxe2PercentX1.toLocaleString()} k</td>
                   <td className="py-2.5 px-3 text-right text-slate-400 bg-amber-950/10">{taxe2PercentXN.toLocaleString()} k</td>
                 </tr>
 
+                {/* BÉNÉFICE NET */}
                 <tr className="bg-slate-950 font-bold border-t border-slate-800">
                   <td className="py-3 px-3 font-sans text-slate-100">Bénéfice Net (Marge Nette)</td>
                   <td className="py-3 px-3 text-right">
@@ -398,6 +500,7 @@ export default function Calcul({ onNavigate }) {
                   </td>
                 </tr>
 
+                {/* TAUX DE MARGE */}
                 <tr className="bg-slate-950/80 font-bold">
                   <td className="py-3 px-3 font-sans text-slate-100">Taux de Marge</td>
                   <td className={`py-3 px-3 text-right ${margeNetteX1 >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -407,6 +510,7 @@ export default function Calcul({ onNavigate }) {
                     {tauxMargeXN}%
                   </td>
                 </tr>
+
               </tbody>
             </table>
           </div>
