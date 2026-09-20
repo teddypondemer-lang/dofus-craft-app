@@ -154,8 +154,8 @@ export default function IngredientsManager({ onNavigate }) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
-      {/* Passage à max-w-5xl pour correspondre exactement au composant Favoris */}
-      <div className="max-w-5xl mx-auto space-y-6">
+      {/* Passage à max-w-6xl pour correspondre exactement au composant Favoris */}
+      <div className="max-w-6xl mx-auto space-y-6">
         
         {/* BARRE DE NAVIGATION ET TITRE */}
         <NavigationHeader
