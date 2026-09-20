@@ -3,7 +3,7 @@ import NavigationHeader from './NavigationHeader';
 
 // Extraction sécurisée du nom
 const getName = (obj) => {
-  if (!obj) return 'Inconnu';
+  if (!obj) return 'Aucun objet sélectionné';
   if (typeof obj === 'string') return obj;
 
   const raw =
@@ -14,11 +14,11 @@ const getName = (obj) => {
 
   if (typeof raw === 'string') return raw;
   if (typeof raw === 'object' && raw !== null) {
-    return raw.fr || raw.en || raw.de || raw.es || raw.name || 'Inconnu';
+    return raw.fr || raw.en || raw.de || raw.es || raw.name || 'Aucun objet sélectionné';
   }
 
   if (obj.fr || obj.en) return obj.fr || obj.en;
-  return 'Inconnu';
+  return 'Aucun objet sélectionné';
 };
 
 // Extraction sécurisée de l'icône
@@ -82,12 +82,15 @@ export default function Calcul({ onNavigate }) {
       }
     }
 
-    // 3. Charger le catalogue des équipements
+    // 3. Charger le catalogue des équipements et sélectionner le 1er automatiquement
     fetch('https://api.dofusdu.de/dofus3/v1/fr/items/equipment/all')
       .then((res) => res.json())
       .then((data) => {
         const list = Array.isArray(data) ? data : data.items || [];
         setEquipments(list);
+        if (list.length > 0) {
+          setSelectedItem(list[0]); // Sélectionne le 1er équipement par défaut
+        }
         setLoading(false);
       })
       .catch((err) => {
@@ -111,7 +114,7 @@ export default function Calcul({ onNavigate }) {
       setMarketPrice(0);
     }
 
-    // Vérifier si des ingrédients ont des noms inconnus et charger le dictionnaire ressources
+    // Vérifier si des ingrédients ont des noms inconnus et charger les ressources si besoin
     const recipeList = Array.isArray(selectedItem.recipe)
       ? selectedItem.recipe
       : Array.isArray(selectedItem.recipe?.ingredients)
@@ -121,7 +124,7 @@ export default function Calcul({ onNavigate }) {
           : [];
 
     const needsFallback = recipeList.some(
-      (ing) => getName(ing) === 'Inconnu' || !getItemIcon(ing)
+      (ing) => getName(ing) === 'Aucun objet sélectionné' || !getItemIcon(ing)
     );
 
     if (needsFallback && Object.keys(fetchedResources).length === 0) {
@@ -280,8 +283,8 @@ export default function Calcul({ onNavigate }) {
         </div>
 
         {loading && (
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center text-amber-400 font-semibold animate-pulse">
-            Chargement de la base d'équipements...
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center text-amber-400 font-semibold animate-pulse text-xs">
+            Chargement de la base de données...
           </div>
         )}
 
@@ -300,10 +303,10 @@ export default function Calcul({ onNavigate }) {
               </div>
               <div>
                 <h2 className="text-lg font-bold text-slate-100">
-                  {selectedItem ? getName(selectedItem) : 'Sélectionnez un équipement'}
+                  {selectedItem ? getName(selectedItem) : 'Aucun équipement sélectionné'}
                 </h2>
                 <p className="text-xs text-amber-500 font-mono">
-                  {selectedItem ? `Niveau ${selectedItem.level || '?'}` : 'Recherchez un item ci-dessus'}
+                  {selectedItem ? `Niveau ${selectedItem.level || '?'}` : 'Recherchez un objet dans la barre ci-dessus'}
                 </p>
               </div>
             </div>
@@ -355,11 +358,11 @@ export default function Calcul({ onNavigate }) {
             </div>
 
             {!selectedItem ? (
-              <div className="text-xs text-slate-500 italic p-3 text-center border border-dashed border-slate-800 rounded-lg">
-                Recherchez et sélectionnez un équipement pour afficher sa recette.
+              <div className="text-xs text-slate-500 italic p-4 text-center border border-dashed border-slate-800 rounded-lg">
+                Aucun équipement sélectionné.
               </div>
             ) : recipe.length === 0 ? (
-              <div className="text-xs text-slate-500 italic p-3 text-center border border-dashed border-slate-800 rounded-lg">
+              <div className="text-xs text-slate-500 italic p-4 text-center border border-dashed border-slate-800 rounded-lg">
                 Aucune recette disponible pour cet équipement.
               </div>
             ) : (
@@ -379,7 +382,7 @@ export default function Calcul({ onNavigate }) {
                       const ingId = getIngredientId(ing);
                       const fallbackRes = fetchedResources[ingId] || {};
 
-                      const ingName = getName(ing) !== 'Inconnu'
+                      const ingName = getName(ing) !== 'Aucun objet sélectionné'
                         ? getName(ing)
                         : getName(fallbackRes);
 
