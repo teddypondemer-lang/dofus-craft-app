@@ -154,7 +154,8 @@ export default function IngredientsManager({ onNavigate }) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
-      <div className="max-w-4xl mx-auto space-y-6">
+      {/* Passage à max-w-5xl pour correspondre exactement au composant Favoris */}
+      <div className="max-w-5xl mx-auto space-y-6">
         
         {/* BARRE DE NAVIGATION ET TITRE */}
         <NavigationHeader
@@ -174,8 +175,8 @@ export default function IngredientsManager({ onNavigate }) {
             Aucune ressource à afficher. Ajoutez d'abord des équipements à vos favoris.
           </div>
         ) : (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-            <div className="divide-y divide-slate-800">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl p-2">
+            <div className="divide-y divide-slate-800/80">
               {ingredientsList.map((ing, idx) => {
                 if (!ing) return null;
                 const ingId = getIngredientId(ing) || idx;
@@ -193,10 +194,10 @@ export default function IngredientsManager({ onNavigate }) {
                 return (
                   <div
                     key={ingId}
-                    className="flex items-center justify-between p-3.5 hover:bg-slate-800/40 transition gap-4"
+                    className="flex items-center justify-between p-4 hover:bg-slate-800/40 transition gap-4"
                   >
                     {/* Icône + Nom + Date de MAJ */}
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-4 min-w-0">
                       <div className="w-10 h-10 rounded bg-slate-950 border border-slate-800 flex items-center justify-center p-1 shrink-0">
                         {ingIcon ? (
                           <img
@@ -209,9 +210,9 @@ export default function IngredientsManager({ onNavigate }) {
                         )}
                       </div>
                       <div className="min-w-0">
-                        <div className="font-semibold text-slate-100 text-sm truncate">{displayName}</div>
+                        <div className="font-bold text-slate-100 text-sm truncate">{displayName}</div>
                         <div className="text-[11px] text-slate-500">
-                          Dernière MAJ : <span className="text-slate-400">{formatDate(savedInfo.updatedAt)}</span>
+                          Dernière MAJ : <span className="text-slate-400 font-mono">{formatDate(savedInfo.updatedAt)}</span>
                         </div>
                       </div>
                     </div>
@@ -223,7 +224,7 @@ export default function IngredientsManager({ onNavigate }) {
                         value={currentPrice}
                         onChange={(e) => handlePriceChange(ingId, e.target.value)}
                         placeholder="Prix unitaire"
-                        className="w-32 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-lg px-3 py-1.5 text-right text-xs text-amber-400 font-mono focus:outline-none transition"
+                        className="w-36 bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-lg px-3 py-1.5 text-right text-xs text-amber-400 font-mono font-bold focus:outline-none transition"
                       />
                       <span className="text-xs text-slate-500 font-bold">k</span>
                     </div>
