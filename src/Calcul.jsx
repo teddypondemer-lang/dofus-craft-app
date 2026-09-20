@@ -187,7 +187,7 @@ export default function Calcul({ onNavigate }) {
 
         {/* NAVIGATION */}
         <NavigationHeader
-          title="🛡️ Calculateur de Rentabilité"
+          title="🛡️ Calculateur de Rentabilité bleh"
           currentView="equipments"
           onNavigate={onNavigate}
         />
