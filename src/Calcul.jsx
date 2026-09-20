@@ -508,7 +508,7 @@ export default function Calcul({ onNavigate }) {
 
                 {/* TAUX DE MARGE */}
                 <tr className="bg-slate-950/80 font-bold">
-                  <td className="py-3 px-3 font-sans text-slate-100">Taux de Marge</td>
+                  <td className="py-3 px-3 font-sans text-slate-100">Taux de Marge Nette</td>
                   <td className={`py-3 px-3 text-right ${margeNetteX1 >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {tauxMargeX1}%
                   </td>
