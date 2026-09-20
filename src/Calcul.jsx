@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import NavigationHeader from './NavigationHeader';
 
-// Objet "Larme du Bouftou" par défaut
+// Item par défaut entièrement renseigné
 const DEFAULT_ITEM = {
   ankama_id: 2411,
   name: "Larme du Bouftou",
@@ -49,49 +49,49 @@ export default function Calcul({ onNavigate }) {
 
   useEffect(() => {
     // 1. Charger les favoris
-    const savedFavs = localStorage.getItem('dofus_favorites');
-    if (savedFavs) {
-      try { setFavorites(JSON.parse(savedFavs)); } catch (e) {}
+    try {
+      const savedFavs = localStorage.getItem('dofus_favorites');
+      if (savedFavs) setFavorites(JSON.parse(savedFavs));
+    } catch (e) {
+      setFavorites([]);
     }
 
     // 2. Charger les prix des ingrédients
-    const savedPrices = localStorage.getItem('dofus_ingredient_prices');
-    if (savedPrices) {
-      try {
+    try {
+      const savedPrices = localStorage.getItem('dofus_ingredient_prices');
+      if (savedPrices) {
         const parsed = JSON.parse(savedPrices);
         const map = {};
-        Object.keys(parsed).forEach((k) => { map[k] = parsed[k]?.price || 0; });
+        Object.keys(parsed || {}).forEach((k) => { map[k] = parsed[k]?.price || 0; });
         setIngredientPrices(map);
-      } catch (e) {}
+      }
+    } catch (e) {
+      setIngredientPrices({});
     }
 
     // 3. Charger la liste globale des équipements
     fetch('https://api.dofusdu.de/dofus3/v1/fr/items/equipment/all')
       .then((res) => res.json())
       .then((data) => {
-        const list = Array.isArray(data) ? data : data.items || [];
+        const list = Array.isArray(data) ? data : (data && data.items) || [];
         setEquipments(list);
       })
-      .catch((err) => console.error(err));
-      
-    // Charge le détail complet pour l'objet par défaut (Larme du Bouftou)
-    fetchItemDetails(DEFAULT_ITEM.ankama_id);
+      .catch((err) => console.error("Erreur équipements :", err));
   }, []);
 
-  // Fonction pour aller chercher la vraie recette complète sur l'API
   const fetchItemDetails = (ankamaId) => {
     if (!ankamaId) return;
     setLoading(true);
     fetch(`https://api.dofusdu.de/dofus3/v1/fr/items/equipment/${ankamaId}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data) {
+        if (data && typeof data === 'object') {
           setSelectedItem(data);
         }
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Erreur chargement détail :", err);
+        console.error("Erreur détail :", err);
         setLoading(false);
       });
   };
@@ -101,44 +101,51 @@ export default function Calcul({ onNavigate }) {
       setMarketPrice(0);
       return;
     }
-    const itemId = selectedItem.ankama_id;
-    const savedEqPrices = JSON.parse(localStorage.getItem('dofus_equipment_prices') || '{}');
-    setMarketPrice(savedEqPrices[itemId] || 0);
+    try {
+      const itemId = selectedItem.ankama_id;
+      const savedEqPrices = JSON.parse(localStorage.getItem('dofus_equipment_prices') || '{}');
+      setMarketPrice(savedEqPrices[itemId] || 0);
+    } catch (e) {
+      setMarketPrice(0);
+    }
   }, [selectedItem]);
 
   const handleMarketPriceChange = (val) => {
     const num = val === '' ? 0 : Number(val);
     setMarketPrice(num);
     if (selectedItem && selectedItem.ankama_id) {
-      const itemId = selectedItem.ankama_id;
-      const savedEqPrices = JSON.parse(localStorage.getItem('dofus_equipment_prices') || '{}');
-      savedEqPrices[itemId] = num;
-      localStorage.setItem('dofus_equipment_prices', JSON.stringify(savedEqPrices));
+      try {
+        const itemId = selectedItem.ankama_id;
+        const savedEqPrices = JSON.parse(localStorage.getItem('dofus_equipment_prices') || '{}');
+        savedEqPrices[itemId] = num;
+        localStorage.setItem('dofus_equipment_prices', JSON.stringify(savedEqPrices));
+      } catch (e) {}
     }
   };
 
   const toggleFavorite = (item) => {
     if (!item || !item.ankama_id) return;
     const itemId = item.ankama_id;
-    const exists = favorites.some((f) => f.ankama_id === itemId);
+    const safeFavs = Array.isArray(favorites) ? favorites : [];
+    const exists = safeFavs.some((f) => f && f.ankama_id === itemId);
     const updated = exists
-      ? favorites.filter((f) => f.ankama_id !== itemId)
-      : [...favorites, item];
+      ? safeFavs.filter((f) => f && f.ankama_id !== itemId)
+      : [...safeFavs, item];
     setFavorites(updated);
     localStorage.setItem('dofus_favorites', JSON.stringify(updated));
   };
 
-  const filteredEquipments = equipments.filter((item) =>
-    getName(item).toLowerCase().includes(searchQuery.toLowerCase())
+  const safeEquipments = Array.isArray(equipments) ? equipments : [];
+  const filteredEquipments = safeEquipments.filter((item) =>
+    getName(item).toLowerCase().includes((searchQuery || '').toLowerCase())
   );
 
   const handleSelectItem = (item) => {
     setSearchQuery('');
     setFmCost(0);
     setDesiredQuantity(1);
-    // On va chercher la fiche complète avec sa recette
     const id = item.ankama_id || item.id;
-    fetchItemDetails(id);
+    if (id) fetchItemDetails(id);
   };
 
   const recipe = useMemo(() => {
@@ -149,7 +156,6 @@ export default function Calcul({ onNavigate }) {
     return [];
   }, [selectedItem]);
 
-  // Calculs
   const targetQty = desiredQuantity > 0 ? desiredQuantity : 1;
   const costX1 = recipe.reduce((acc, ing) => {
     const id = getIngredientId(ing);
@@ -170,8 +176,9 @@ export default function Calcul({ onNavigate }) {
   const margeNetteXN = margeNetteX1 * targetQty;
   const tauxMargeXN = costXN > 0 ? ((margeNetteXN / costXN) * 100).toFixed(0) : 0;
 
+  const safeFavs = Array.isArray(favorites) ? favorites : [];
   const isCurrentFav = selectedItem
-    ? favorites.some((f) => f.ankama_id === selectedItem.ankama_id)
+    ? safeFavs.some((f) => f && f.ankama_id === selectedItem.ankama_id)
     : false;
 
   return (
